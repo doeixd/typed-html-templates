@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src", "test/typecheck*.ts"],
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "skipLibCheck": true
+  }
+}
