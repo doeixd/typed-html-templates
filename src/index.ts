@@ -514,27 +514,56 @@ export function single<Result>(result: Result | Result[]): Result {
   return result;
 }
 
-export function template<const Parts extends readonly [string, ...string[]]>(
+export function asConst<const Value>(value: Value): Value {
+  return value;
+}
+
+type TemplateStringsFor<Parts extends readonly [string, ...string[]]> = TemplateStringsArray & Parts;
+type TemplateTuple<
+  Parts extends readonly [string, ...string[]],
+  Values extends readonly unknown[]
+> = readonly [TemplateStringsFor<Parts>, ...Values];
+
+type TemplateBuilder = {
+  <const Parts extends readonly [string, ...string[]]>(parts: Parts): TemplateStringsFor<Parts>;
+  <const Parts extends readonly [string, ...string[]], const Values extends readonly unknown[]>(
+    parts: Parts,
+    ...values: Values
+  ): TemplateTuple<Parts, Values>;
+  from: TemplateBuilder;
+  dom: TemplateBuilder;
+  one: TemplateBuilder;
+};
+
+const toTemplateStrings = <const Parts extends readonly [string, ...string[]]>(
   parts: Parts
-): TemplateStringsArray & Parts;
-export function template<
-  const Parts extends readonly [string, ...string[]],
-  const Values extends readonly unknown[]
->(
-  parts: Parts,
-  ...values: Values
-): readonly [TemplateStringsArray & Parts, ...Values];
-export function template(
+): TemplateStringsFor<Parts> => {
+  const clone = [...parts] as string[];
+  const strings = Object.assign(clone, { raw: clone }) as unknown as TemplateStringsFor<Parts>;
+  return strings;
+};
+
+const templateBase = (
   parts: readonly [string, ...string[]],
   ...values: readonly unknown[]
-): TemplateStringsArray | readonly [TemplateStringsArray, ...unknown[]] {
-  const clone = [...parts] as string[];
-  const strings = Object.assign(clone, { raw: clone }) as TemplateStringsArray;
+): TemplateStringsArray | readonly [TemplateStringsArray, ...unknown[]] => {
+  const strings = toTemplateStrings(parts);
   if (values.length === 0) {
     return strings;
   }
   return [strings, ...values] as const;
-}
+};
+
+export const template = templateBase as TemplateBuilder;
+
+template.from = ((parts: readonly [string, ...string[]], ...values: readonly unknown[]) =>
+  templateBase(parts, ...values)) as TemplateBuilder;
+
+template.dom = ((parts: readonly [string, ...string[]], ...values: readonly unknown[]) =>
+  templateBase(parts, ...values)) as TemplateBuilder;
+
+template.one = ((parts: readonly [string, ...string[]], ...values: readonly unknown[]) =>
+  templateBase(parts, ...values)) as TemplateBuilder;
 
 export type ElementForTag<Tag extends string> = Lowercase<Tag> extends keyof HTMLElementTagNameMap
   ? HTMLElementTagNameMap[Lowercase<Tag>]
@@ -597,6 +626,76 @@ export type DefaultHtml = <const Strings extends readonly string[], const Values
   ...values: ValidateInterpolationValues<InterpolationContexts<Strings>, Values, DefaultIntrinsicElements>
 ) => DefaultNodeForTemplate<Strings> | DefaultNodeForTemplate<Strings>[];
 
-const html = bind(defaultH) as DefaultHtml;
+export type DefaultStrictHtml = <const Strings extends readonly string[], const Values extends readonly unknown[]>(
+  strings: TemplateStringsArray & Strings,
+  ...values: ValidateInterpolationValues<InterpolationContexts<Strings>, Values, DefaultIntrinsicElements, true>
+) => DefaultNodeForTemplate<Strings> | DefaultNodeForTemplate<Strings>[];
+
+export type DefaultHtmlWithParams = DefaultHtml & {
+  params<const Head extends string, const Tail extends readonly string[]>(
+    head: Head,
+    ...tail: Tail
+  ): (
+    ...values: readonly unknown[]
+  ) => DefaultNodeForTemplate<readonly [Head, ...Tail]> | DefaultNodeForTemplate<readonly [Head, ...Tail]>[];
+  from<const Head extends string, const Tail extends readonly string[]>(
+    head: Head,
+    ...tail: Tail
+  ): (
+    ...values: readonly unknown[]
+  ) => DefaultNodeForTemplate<readonly [Head, ...Tail]> | DefaultNodeForTemplate<readonly [Head, ...Tail]>[];
+};
+
+export type DefaultStrictHtmlWithParams = DefaultStrictHtml & {
+  params<const Head extends string, const Tail extends readonly string[]>(
+    head: Head,
+    ...tail: Tail
+  ): (
+    ...values: readonly unknown[]
+  ) => DefaultNodeForTemplate<readonly [Head, ...Tail]> | DefaultNodeForTemplate<readonly [Head, ...Tail]>[];
+  from<const Head extends string, const Tail extends readonly string[]>(
+    head: Head,
+    ...tail: Tail
+  ): (
+    ...values: readonly unknown[]
+  ) => DefaultNodeForTemplate<readonly [Head, ...Tail]> | DefaultNodeForTemplate<readonly [Head, ...Tail]>[];
+};
+
+const htmlBase = bind(defaultH) as DefaultHtml;
+const strictHtmlBase = bindStrict(defaultH) as DefaultStrictHtml;
+
+const htmlParams = <const Head extends string, const Tail extends readonly string[]>(
+  head: Head,
+  ...tail: Tail
+) =>
+  (...values: readonly unknown[]) => {
+    const parts = [head, ...tail] as unknown as readonly [Head, ...Tail];
+    const args = template(parts, ...values) as unknown as [TemplateStringsArray & typeof parts, ...unknown[]];
+    return (htmlBase as (...runtimeArgs: unknown[]) => unknown)(...args) as
+      | DefaultNodeForTemplate<readonly [Head, ...Tail]>
+      | DefaultNodeForTemplate<readonly [Head, ...Tail]>[];
+  };
+
+const strictHtmlParams = <const Head extends string, const Tail extends readonly string[]>(
+  head: Head,
+  ...tail: Tail
+) =>
+  (...values: readonly unknown[]) => {
+    const parts = [head, ...tail] as unknown as readonly [Head, ...Tail];
+    const args = template(parts, ...values) as unknown as [TemplateStringsArray & typeof parts, ...unknown[]];
+    return (strictHtmlBase as (...runtimeArgs: unknown[]) => unknown)(...args) as
+      | DefaultNodeForTemplate<readonly [Head, ...Tail]>
+      | DefaultNodeForTemplate<readonly [Head, ...Tail]>[];
+  };
+
+const html = Object.assign(htmlBase, {
+  params: htmlParams,
+  from: htmlParams
+}) as DefaultHtmlWithParams;
+
+export const strictHtml = Object.assign(strictHtmlBase, {
+  params: strictHtmlParams,
+  from: strictHtmlParams
+}) as DefaultStrictHtmlWithParams;
 
 export default html;

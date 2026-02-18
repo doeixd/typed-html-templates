@@ -51,6 +51,29 @@ import html, { template } from 'typed-html-templates';
 const result = html(...template(['<input value=', ' checked=', ' />'] as const, 'ok', true));
 ```
 
+If you prefer not to write `as const` at call sites, use `asConst(...)`:
+
+```ts
+import html, { asConst, template } from 'typed-html-templates';
+
+const result = html(...template(asConst(['<input value=', ' />']), 'ok'));
+```
+
+Aliases are included for readability in different contexts:
+
+- `template.from(...)`
+- `template.dom(...)`
+- `template.one(...)`
+
+You can also use `html.params(...)` / `html.from(...)` (and strict equivalents) for a plain variadic-strings style:
+
+```ts
+const renderInput = html.params('<input value=', ' />');
+const node = renderInput('ok');
+```
+
+`params/from` are primarily for root-shape ergonomics and readability. For strongest hole-level type safety, prefer `template(...)` + spread into `html(...)`.
+
 For editor DX, `template(...)` usually gives the strongest root-tag inference (for example, `input` -> `HTMLInputElement`).
 
 For static intrinsic roots, the default node type also carries a typed `element?` field:
@@ -92,6 +115,16 @@ html(...template(['<input notARealProp=', ' />'] as const, 'x'));
 const Card = (_props: { title: string }) => null;
 // @ts-expect-error unknown component prop
 html(...template(['<', ' nope=', ' />'] as const, Card, 'x'));
+```
+
+If you want strict mode with the default binding, use `strictHtml` directly:
+
+```ts
+import { strictHtml, template } from 'typed-html-templates';
+
+strictHtml`<input value=${'ok'} />`;
+// @ts-expect-error unknown intrinsic attr in strict mode
+strictHtml(...template.one(['<input notARealProp=', ' />'] as const, 'x'));
 ```
 
 ## Inference notes
@@ -295,12 +328,15 @@ html`<div id=${123} />`;
 ## API
 
 - `default` -> `html` bound to a default object-returning `h`
+- `strictHtml` -> strict-mode default export (unknown attrs rejected in known contexts)
 - `bind(h)` -> typed HTM-compatible tag function
 - `bindStrict(h)` -> typed HTM-compatible tag function that rejects unknown attrs in known contexts
 - `bindSingle(h)` -> typed HTM-compatible tag that enforces exactly one root at runtime
 - `bindSingleStrict(h)` -> strict + single-root runtime enforcement
 - `single(result)` -> unwraps a `result | result[]`, throws if root count is not exactly one
+- `asConst(value)` -> const-generic identity helper for literal-preserving inference
 - `template(parts, ...values)` -> helper that preserves literal template parts and value tuple inference
+- `template.from/dom/one` -> aliases of `template(...)` for intent/readability
 - `DOMIntrinsicElements` -> built-in intrinsic map from `HTMLElementTagNameMap`
 - `InferComponentProps<T>` -> extract component props
 - `ComponentType<Props, Result>` -> component function/class shape

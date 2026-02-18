@@ -1,4 +1,4 @@
-import defaultHtml, { bind, bindStrict, single, template } from '../src';
+import defaultHtml, { asConst, bind, bindStrict, single, strictHtml, template } from '../src';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => ({
   type,
@@ -7,7 +7,7 @@ const h = (type: unknown, props: Record<string, unknown> | null, ...children: un
 });
 
 const html = bind(h);
-const strictHtml = bindStrict(h);
+const strictBound = bindStrict(h);
 
 const inputValue = template(['<input value=', ' />'] as const);
 void html(inputValue, 'ok');
@@ -65,6 +65,21 @@ void helperTupleOk;
 // @ts-expect-error input value should be string
 void html(...template(['<input value=', ' />'] as const, 123));
 
+const helperFromOk = html(...template.from(['<input value=', ' />'] as const, 'ok'));
+void helperFromOk;
+const helperDomOk = html(...template.dom(['<input value=', ' />'] as const, 'ok'));
+void helperDomOk;
+const helperAsConstOk = html(...template(asConst(['<input value=', ' />']), 'ok'));
+void helperAsConstOk;
+
+const paramsOk = defaultHtml.params('<input value=', ' />')('ok');
+void paramsOk;
+void defaultHtml.params('<input value=', ' />')(123);
+
+const strictParamsOk = strictHtml.params('<input value=', ' />')('ok');
+void strictParamsOk;
+void strictHtml.params('<input notARealProp=', ' />')('x');
+
 const inferredNode = single(defaultHtml(...template(['<input value=', ' />'] as const, 'ok')));
 const inferredInputElement: HTMLInputElement | undefined = inferredNode.element;
 void inferredInputElement;
@@ -80,8 +95,12 @@ void taggedElement;
 const taggedTag: string = taggedNode.type;
 void taggedTag;
 
-strictHtml`<input value=${'ok'} checked=${true} />`;
+strictBound`<input value=${'ok'} checked=${true} />`;
 // @ts-expect-error strict mode rejects unknown attrs on known intrinsic tags
-strictHtml(...template(['<input notARealProp=', ' />'] as const, 'x'));
+strictBound(...template(['<input notARealProp=', ' />'] as const, 'x'));
 // @ts-expect-error strict mode rejects unknown attrs on component props
-strictHtml(...template(['<', ' nope=', ' />'] as const, Comp, 'x'));
+strictBound(...template(['<', ' nope=', ' />'] as const, Comp, 'x'));
+
+strictHtml`<input value=${'ok'} />`;
+// @ts-expect-error strictHtml export rejects unknown attrs on known intrinsic tags
+strictHtml(...template.one(['<input unknown=', ' />'] as const, 'x'));

@@ -1,4 +1,12 @@
-import html, { bind, bindStrict, single, template, type DOMIntrinsicElements } from '../src';
+import html, {
+  asConst,
+  bind,
+  bindStrict,
+  single,
+  strictHtml,
+  template,
+  type DOMIntrinsicElements
+} from '../src';
 
 // Open this file in VS Code (or another TS-aware editor) and hover values
 // to inspect what each `${...}` hole expects.
@@ -7,17 +15,17 @@ import html, { bind, bindStrict, single, template, type DOMIntrinsicElements } f
 // 1) Default html (DOM-typed)
 // -----------------------------
 
-const domOk = single(html(...template(['<input value=', ' checked=', ' />'] as const, 'hello', true)));
+const domOk = single(html(...template.dom(asConst(['<input value=', ' checked=', ' />']), 'hello', true)));
 // Hover `domOk`:
 // - You should see `Node<"input", ...>`.
 // - `domOk.type` resolves to the root tag literal ("input").
 // - `domOk.element` resolves to `HTMLInputElement | undefined`.
 
 // You can still request only the strings object:
-const inputTemplate = template(['<input value=', ' />'] as const);
+const inputTemplate = template.from(asConst(['<input value=', ' />']));
 
 const inputValue = inputTemplate;
-const inputChecked = template(['<input checked=', ' />'] as const);
+const inputChecked = template.dom(asConst(['<input checked=', ' />']));
 
 html(inputValue, 'hello');
 html(inputChecked, true);
@@ -80,10 +88,13 @@ const customOk = typedHtml`<button disabled=${true}>${'click'}</button>`;
 // Hover `customOk`:
 // - Return type is inferred from `h`.
 
-const strictHtml = bindStrict(h);
-strictHtml`<input value=${'ok'} />`;
+const strictBound = bindStrict(h);
+strictBound`<input value=${'ok'} />`;
 // invalid in strict mode (unknown prop for input)
-// strictHtml(...template(['<input notARealProp=', ' />'] as const, 'x'));
+// strictBound(...template.one(['<input notARealProp=', ' />'] as const, 'x'));
+
+// Or use the default strict export (bound to defaultH):
+strictHtml`<input value=${'ok'} />`;
 
 // Event holes are function-typed for on* attrs.
 const onClickHole = template(['<button onClick=', ' />'] as const);
