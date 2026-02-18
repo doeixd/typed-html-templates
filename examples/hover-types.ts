@@ -1,4 +1,4 @@
-import html, { bind, single, template, type DOMIntrinsicElements } from '../src';
+import html, { bind, bindStrict, single, template, type DOMIntrinsicElements } from '../src';
 
 // Open this file in VS Code (or another TS-aware editor) and hover values
 // to inspect what each `${...}` hole expects.
@@ -79,6 +79,11 @@ const typedHtml = bind(h);
 const customOk = typedHtml`<button disabled=${true}>${'click'}</button>`;
 // Hover `customOk`:
 // - Return type is inferred from `h`.
+
+const strictHtml = bindStrict(h);
+strictHtml`<input value=${'ok'} />`;
+// invalid in strict mode (unknown prop for input)
+// strictHtml(...template(['<input notARealProp=', ' />'] as const, 'x'));
 
 // Event holes are function-typed for on* attrs.
 const onClickHole = template(['<button onClick=', ' />'] as const);

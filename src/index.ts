@@ -243,11 +243,7 @@ type DomDataAriaProps = {
   [K in `aria-${string}`]?: PrimitiveAttr;
 };
 
-type DomEventProps = {
-  [K in `on${string}`]?: ((event: Event) => unknown) | null;
-};
-
-type DomProps<ElementType extends Element> = BaseDomProps<ElementType> & DomDataAriaProps & DomEventProps;
+type DomProps<ElementType extends Element> = BaseDomProps<ElementType> & DomDataAriaProps;
 
 export type DOMIntrinsicElements = {
   [K in keyof HTMLElementTagNameMap]: DomProps<HTMLElementTagNameMap[K]>;
@@ -264,68 +260,81 @@ type LowercaseKeyMatch<Props, Attr extends string> = {
   [K in Extract<keyof Props, string>]: Lowercase<K> extends Lowercase<Attr> ? Props[K] : never;
 }[Extract<keyof Props, string>];
 
-type FallbackAttrValue<Attr extends string> = Lowercase<Attr> extends `on${string}`
-  ? ((event: Event) => unknown) | null
-  : PrimitiveAttr;
+type FallbackAttrValue<Attr extends string, Strict extends boolean> = Strict extends true
+  ? never
+  : Lowercase<Attr> extends `on${string}`
+    ? ((event: Event) => unknown) | null
+    : PrimitiveAttr;
 
-type LookupAttrValue<Props, Attr extends string> = Attr extends keyof Props
+type LookupAttrValue<Props, Attr extends string, Strict extends boolean = false> = Attr extends keyof Props
   ? Props[Attr]
   : LowercaseKeyMatch<Props, Attr> extends never
-    ? FallbackAttrValue<Attr>
+    ? FallbackAttrValue<Attr, Strict>
     : LowercaseKeyMatch<Props, Attr>;
 
 type AttrValueFor<
   Intrinsic extends IntrinsicElementsMap,
   Tag extends string,
   Attr extends string,
-  Dynamic extends boolean
+  Dynamic extends boolean,
+  Strict extends boolean = false
 > = Dynamic extends true
-  ? PrimitiveAttr
-  : Lowercase<Attr> extends `on${string}`
-    ? ((event: Event) => unknown) | null
+  ? FallbackAttrValue<Attr, Strict>
   : Lowercase<Tag> extends keyof Intrinsic
-    ? LookupAttrValue<Intrinsic[Lowercase<Tag>], Attr>
-    : PrimitiveAttr;
+    ? LookupAttrValue<Intrinsic[Lowercase<Tag>], Attr, Strict>
+    : FallbackAttrValue<Attr, Strict>;
 
 type SpreadValueFor<
   Intrinsic extends IntrinsicElementsMap,
   Tag extends string,
-  Dynamic extends boolean
+  Dynamic extends boolean,
+  Strict extends boolean = false
 > = Dynamic extends true
-  ? Record<string, unknown> | null | undefined
+  ? Strict extends true
+    ? never
+    : Record<string, unknown> | null | undefined
   : Lowercase<Tag> extends keyof Intrinsic
     ? Partial<Intrinsic[Lowercase<Tag>]> | null | undefined
-    : Record<string, unknown> | null | undefined;
+    : Strict extends true
+      ? never
+      : Record<string, unknown> | null | undefined;
 
 type AttrValueForTagValue<
   Intrinsic extends IntrinsicElementsMap,
   Tag,
-  Attr extends string
+  Attr extends string,
+  Strict extends boolean = false
 > = Lowercase<Attr> extends `on${string}`
-  ? ((event: Event) => unknown) | null
+  ? FallbackAttrValue<Attr, Strict>
   : Tag extends string
   ? Lowercase<Tag> extends keyof Intrinsic
-    ? LookupAttrValue<Intrinsic[Lowercase<Tag>], Attr>
-    : PrimitiveAttr
+    ? LookupAttrValue<Intrinsic[Lowercase<Tag>], Attr, Strict>
+    : FallbackAttrValue<Attr, Strict>
   : Tag extends ComponentType<any>
-    ? LookupAttrValue<InferComponentProps<Tag>, Attr>
-    : PrimitiveAttr;
+    ? LookupAttrValue<InferComponentProps<Tag>, Attr, Strict>
+    : FallbackAttrValue<Attr, Strict>;
 
 type SpreadValueForTagValue<
   Intrinsic extends IntrinsicElementsMap,
-  Tag
+  Tag,
+  Strict extends boolean = false
 > = Tag extends string
   ? Lowercase<Tag> extends keyof Intrinsic
     ? Partial<Intrinsic[Lowercase<Tag>]> | null | undefined
-    : Record<string, unknown> | null | undefined
+    : Strict extends true
+      ? never
+      : Record<string, unknown> | null | undefined
   : Tag extends ComponentType<any>
     ? Partial<InferComponentProps<Tag>> | null | undefined
-    : Record<string, unknown> | null | undefined;
+    : Strict extends true
+      ? never
+      : Record<string, unknown> | null | undefined;
 
 type ValidateInterpolationValues<
   Contexts extends readonly InterpolationContext[],
   Values extends readonly unknown[],
   Intrinsic extends IntrinsicElementsMap,
+  Strict extends boolean = false,
   ActiveTag = never,
   Out extends readonly unknown[] = readonly []
 > = Contexts extends readonly [
@@ -339,26 +348,29 @@ type ValidateInterpolationValues<
             RestContexts,
             RestValues,
             Intrinsic,
+            Strict,
             CurrentValue,
             readonly [...Out, CurrentValue]
           >
         : never
       : CurrentContext extends SpreadContext<infer Tag extends string, infer Dynamic extends boolean>
         ? Dynamic extends true
-          ? CurrentValue extends SpreadValueForTagValue<Intrinsic, ActiveTag>
+          ? CurrentValue extends SpreadValueForTagValue<Intrinsic, ActiveTag, Strict>
             ? ValidateInterpolationValues<
                 RestContexts,
                 RestValues,
                 Intrinsic,
+                Strict,
                 ActiveTag,
                 readonly [...Out, CurrentValue]
               >
             : never
-          : CurrentValue extends SpreadValueFor<Intrinsic, Tag, Dynamic>
+          : CurrentValue extends SpreadValueFor<Intrinsic, Tag, Dynamic, Strict>
             ? ValidateInterpolationValues<
                 RestContexts,
                 RestValues,
                 Intrinsic,
+                Strict,
                 ActiveTag,
                 readonly [...Out, CurrentValue]
               >
@@ -369,20 +381,22 @@ type ValidateInterpolationValues<
               infer Dynamic extends boolean
             >
           ? Dynamic extends true
-            ? CurrentValue extends AttrValueForTagValue<Intrinsic, ActiveTag, Attr>
+            ? CurrentValue extends AttrValueForTagValue<Intrinsic, ActiveTag, Attr, Strict>
               ? ValidateInterpolationValues<
                   RestContexts,
                   RestValues,
                   Intrinsic,
+                  Strict,
                   ActiveTag,
                   readonly [...Out, CurrentValue]
                 >
               : never
-            : CurrentValue extends AttrValueFor<Intrinsic, Tag, Attr, Dynamic>
+            : CurrentValue extends AttrValueFor<Intrinsic, Tag, Attr, Dynamic, Strict>
               ? ValidateInterpolationValues<
                   RestContexts,
                   RestValues,
                   Intrinsic,
+                  Strict,
                   ActiveTag,
                   readonly [...Out, CurrentValue]
                 >
@@ -392,6 +406,7 @@ type ValidateInterpolationValues<
                 RestContexts,
                 RestValues,
                 Intrinsic,
+                Strict,
                 ActiveTag,
                 readonly [...Out, CurrentValue]
               >
@@ -425,11 +440,34 @@ export type BoundSingleHtml<
   ...values: ValidateInterpolationValues<InterpolationContexts<Strings>, Values, Intrinsic>
 ) => ReturnType<H>;
 
+export type BoundStrictHtml<
+  H extends HFunction,
+  Intrinsic extends IntrinsicElementsMap = DefaultIntrinsicElements
+> = <const Strings extends readonly string[], const Values extends readonly unknown[]>(
+  strings: TemplateStringsArray & Strings,
+  ...values: ValidateInterpolationValues<InterpolationContexts<Strings>, Values, Intrinsic, true>
+) => ReturnType<H> | ReturnType<H>[];
+
+export type BoundSingleStrictHtml<
+  H extends HFunction,
+  Intrinsic extends IntrinsicElementsMap = DefaultIntrinsicElements
+> = <const Strings extends readonly string[], const Values extends readonly unknown[]>(
+  strings: TemplateStringsArray & Strings,
+  ...values: ValidateInterpolationValues<InterpolationContexts<Strings>, Values, Intrinsic, true>
+) => ReturnType<H>;
+
 export function bind<
   H extends HFunction,
   Intrinsic extends IntrinsicElementsMap = DefaultIntrinsicElements
 >(h: H): BoundHtml<H, Intrinsic> {
   return htm.bind(h) as unknown as BoundHtml<H, Intrinsic>;
+}
+
+export function bindStrict<
+  H extends HFunction,
+  Intrinsic extends IntrinsicElementsMap = DefaultIntrinsicElements
+>(h: H): BoundStrictHtml<H, Intrinsic> {
+  return htm.bind(h) as unknown as BoundStrictHtml<H, Intrinsic>;
 }
 
 export function bindSingle<
@@ -447,6 +485,23 @@ export function bindSingle<
     }
     return result;
   }) as BoundSingleHtml<H, Intrinsic>;
+}
+
+export function bindSingleStrict<
+  H extends HFunction,
+  Intrinsic extends IntrinsicElementsMap = DefaultIntrinsicElements
+>(h: H): BoundSingleStrictHtml<H, Intrinsic> {
+  const bound = htm.bind(h) as unknown as BoundStrictHtml<H, Intrinsic>;
+  return ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    const result = bound(strings, ...values as never);
+    if (Array.isArray(result)) {
+      if (result.length !== 1) {
+        throw new Error(`Expected exactly one root node but got ${result.length}.`);
+      }
+      return result[0] as ReturnType<H>;
+    }
+    return result;
+  }) as BoundSingleStrictHtml<H, Intrinsic>;
 }
 
 export function single<Result>(result: Result | Result[]): Result {

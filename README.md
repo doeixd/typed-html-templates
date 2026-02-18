@@ -70,6 +70,30 @@ When template parts are statically known (tagged templates and `template(...)` h
 
 This means invalid hole values fail at compile time (via TypeScript), not just at runtime.
 
+### Strict mode
+
+Use `bindStrict(h)` when you want unknown attrs to fail for known intrinsic tags and components:
+
+```ts
+import { bindStrict, template } from 'typed-html-templates';
+
+const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => ({
+  type,
+  props,
+  children
+});
+
+const html = bindStrict(h);
+
+html`<input value=${'ok'} />`; // ok
+// @ts-expect-error unknown intrinsic attr
+html(...template(['<input notARealProp=', ' />'] as const, 'x'));
+
+const Card = (_props: { title: string }) => null;
+// @ts-expect-error unknown component prop
+html(...template(['<', ' nope=', ' />'] as const, Card, 'x'));
+```
+
 ## Inference notes
 
 There are two kinds of inference in play:
@@ -272,7 +296,9 @@ html`<div id=${123} />`;
 
 - `default` -> `html` bound to a default object-returning `h`
 - `bind(h)` -> typed HTM-compatible tag function
+- `bindStrict(h)` -> typed HTM-compatible tag function that rejects unknown attrs in known contexts
 - `bindSingle(h)` -> typed HTM-compatible tag that enforces exactly one root at runtime
+- `bindSingleStrict(h)` -> strict + single-root runtime enforcement
 - `single(result)` -> unwraps a `result | result[]`, throws if root count is not exactly one
 - `template(parts, ...values)` -> helper that preserves literal template parts and value tuple inference
 - `DOMIntrinsicElements` -> built-in intrinsic map from `HTMLElementTagNameMap`

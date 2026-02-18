@@ -1,4 +1,4 @@
-import defaultHtml, { bind, single, template } from '../src';
+import defaultHtml, { bind, bindStrict, single, template } from '../src';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => ({
   type,
@@ -7,6 +7,7 @@ const h = (type: unknown, props: Record<string, unknown> | null, ...children: un
 });
 
 const html = bind(h);
+const strictHtml = bindStrict(h);
 
 const inputValue = template(['<input value=', ' />'] as const);
 void html(inputValue, 'ok');
@@ -28,6 +29,9 @@ void html(onClick, (event: Event) => event.type);
 void html(onClick, null);
 // @ts-expect-error event handler should be a function or null
 void html(onClick, 'nope');
+
+const onClickLower = template(['<button onclick=', ' />'] as const);
+void html(onClickLower, (event: MouseEvent) => event.clientX);
 
 const ariaLabel = template(['<div aria-label=', ' />'] as const);
 void html(ariaLabel, 'label');
@@ -75,3 +79,9 @@ const taggedElement: HTMLElement | undefined = taggedNode.element;
 void taggedElement;
 const taggedTag: string = taggedNode.type;
 void taggedTag;
+
+strictHtml`<input value=${'ok'} checked=${true} />`;
+// @ts-expect-error strict mode rejects unknown attrs on known intrinsic tags
+strictHtml(...template(['<input notARealProp=', ' />'] as const, 'x'));
+// @ts-expect-error strict mode rejects unknown attrs on component props
+strictHtml(...template(['<', ' nope=', ' />'] as const, Comp, 'x'));
