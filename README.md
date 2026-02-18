@@ -34,6 +34,72 @@ import html from 'typed-html-templates';
 const node = html`<div id=${'hello'}>${'world'}</div>`;
 ```
 
+`html` returns `Node | Node[]` because HTM supports multiple root nodes.
+If you want a strict single-root result, use `single(...)` or `bindSingle(h)`:
+
+```ts
+import html, { single } from 'typed-html-templates';
+
+const node = single(html`<div id=${'hello'}>${'world'}</div>`);
+```
+
+You can also use the `template(parts, ...values)` helper when you want explicit tuples that preserve inference:
+
+```ts
+import html, { template } from 'typed-html-templates';
+
+const result = html(...template(['<input value=', ' checked=', ' />'] as const, 'ok', true));
+```
+
+For editor DX, `template(...)` usually gives the strongest root-tag inference (for example, `input` -> `HTMLInputElement`).
+
+For static intrinsic roots, the default node type also carries a typed `element?` field:
+
+- `<div ...>` -> `HTMLDivElement | undefined`
+- `<input ...>` -> `HTMLInputElement | undefined`
+
+## Safety guarantees
+
+When template parts are statically known (tagged templates and `template(...)` helper), the library enforces:
+
+- hole-kind checking (tag vs attr-value vs spread vs child)
+- intrinsic attr typing (DOM map by default)
+- dynamic component prop typing (`<${Comp} ...>`)
+- spread shape checking (`...${props}`)
+- event handler typing for `on*` attrs
+
+This means invalid hole values fail at compile time (via TypeScript), not just at runtime.
+
+## Inference notes
+
+There are two kinds of inference in play:
+
+1. **Hole type inference** (what each `${...}` must be)
+2. **Root node narrowing** (whether result becomes `Node<"input", ...>` vs generic `Node<string, ...>`)
+
+Hole type inference is strong in both styles:
+
+- `html` tagged template form
+- `html(...template(parts, ...values))` tuple helper form
+
+Root node narrowing is strongest with `template(...)` tuple form:
+
+```ts
+const node = single(html(...template(['<input value=', ' />'] as const, 'ok')));
+// node.type -> "input"
+// node.element -> HTMLInputElement | undefined
+```
+
+In plain tagged-template syntax, TypeScript may widen root tag information depending on compiler inference limits:
+
+```ts
+const node = single(html`<input value=${'ok'} />`);
+// node.type may be `string`
+// node.element may be `HTMLElement | undefined`
+```
+
+This is a TypeScript inference limitation around tagged-template literal preservation, not a runtime behavior difference.
+
 The default export is `bind(defaultH)`, where `defaultH` returns:
 
 ```ts
@@ -206,6 +272,9 @@ html`<div id=${123} />`;
 
 - `default` -> `html` bound to a default object-returning `h`
 - `bind(h)` -> typed HTM-compatible tag function
+- `bindSingle(h)` -> typed HTM-compatible tag that enforces exactly one root at runtime
+- `single(result)` -> unwraps a `result | result[]`, throws if root count is not exactly one
+- `template(parts, ...values)` -> helper that preserves literal template parts and value tuple inference
 - `DOMIntrinsicElements` -> built-in intrinsic map from `HTMLElementTagNameMap`
 - `InferComponentProps<T>` -> extract component props
 - `ComponentType<Props, Result>` -> component function/class shape

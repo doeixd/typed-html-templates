@@ -417,6 +417,14 @@ export type BoundHtml<
   ...values: ValidateInterpolationValues<InterpolationContexts<Strings>, Values, Intrinsic>
 ) => ReturnType<H> | ReturnType<H>[];
 
+export type BoundSingleHtml<
+  H extends HFunction,
+  Intrinsic extends IntrinsicElementsMap = DefaultIntrinsicElements
+> = <const Strings extends readonly string[], const Values extends readonly unknown[]>(
+  strings: TemplateStringsArray & Strings,
+  ...values: ValidateInterpolationValues<InterpolationContexts<Strings>, Values, Intrinsic>
+) => ReturnType<H>;
+
 export function bind<
   H extends HFunction,
   Intrinsic extends IntrinsicElementsMap = DefaultIntrinsicElements
@@ -424,18 +432,116 @@ export function bind<
   return htm.bind(h) as unknown as BoundHtml<H, Intrinsic>;
 }
 
-export type Node = {
-  type: unknown;
-  props: Record<string, unknown> | null;
+export function bindSingle<
+  H extends HFunction,
+  Intrinsic extends IntrinsicElementsMap = DefaultIntrinsicElements
+>(h: H): BoundSingleHtml<H, Intrinsic> {
+  const bound = htm.bind(h) as unknown as BoundHtml<H, Intrinsic>;
+  return ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    const result = bound(strings, ...values as never);
+    if (Array.isArray(result)) {
+      if (result.length !== 1) {
+        throw new Error(`Expected exactly one root node but got ${result.length}.`);
+      }
+      return result[0] as ReturnType<H>;
+    }
+    return result;
+  }) as BoundSingleHtml<H, Intrinsic>;
+}
+
+export function single<Result>(result: Result | Result[]): Result {
+  if (Array.isArray(result)) {
+    if (result.length !== 1) {
+      throw new Error(`Expected exactly one root node but got ${result.length}.`);
+    }
+    return result[0] as Result;
+  }
+  return result;
+}
+
+export function template<const Parts extends readonly [string, ...string[]]>(
+  parts: Parts
+): TemplateStringsArray & Parts;
+export function template<
+  const Parts extends readonly [string, ...string[]],
+  const Values extends readonly unknown[]
+>(
+  parts: Parts,
+  ...values: Values
+): readonly [TemplateStringsArray & Parts, ...Values];
+export function template(
+  parts: readonly [string, ...string[]],
+  ...values: readonly unknown[]
+): TemplateStringsArray | readonly [TemplateStringsArray, ...unknown[]] {
+  const clone = [...parts] as string[];
+  const strings = Object.assign(clone, { raw: clone }) as TemplateStringsArray;
+  if (values.length === 0) {
+    return strings;
+  }
+  return [strings, ...values] as const;
+}
+
+export type ElementForTag<Tag extends string> = Lowercase<Tag> extends keyof HTMLElementTagNameMap
+  ? HTMLElementTagNameMap[Lowercase<Tag>]
+  : HTMLElement;
+
+export type Node<
+  Tag = unknown,
+  Props extends Record<string, unknown> | null = Record<string, unknown> | null,
+  ElementType = unknown
+> = {
+  type: Tag;
+  props: Props;
   children: unknown[];
+  readonly element?: ElementType;
 };
 
-export const defaultH = (
-  type: unknown,
+export const defaultH = <Tag>(
+  type: Tag,
   props: Record<string, unknown> | null,
   ...children: unknown[]
-): Node => ({ type, props, children });
+): Node<
+  Tag,
+  Record<string, unknown> | null,
+  Tag extends string ? ElementForTag<Tag> : unknown
+> => ({ type, props, children });
 
-const html = bind(defaultH);
+type TrimLeft<S extends string> = S extends `${Whitespace}${infer Rest}` ? TrimLeft<Rest> : S;
+
+type TagBoundary = Whitespace | '/' | '>';
+
+type TakeTagName<S extends string, Acc extends string = ''> = S extends `${infer C}${infer Rest}`
+  ? C extends TagBoundary
+    ? Acc
+    : C extends '$'
+      ? Acc
+      : TakeTagName<Rest, `${Acc}${C}`>
+  : Acc;
+
+type FirstTagFromSegment<S extends string> = TrimLeft<S> extends `<${infer Rest}`
+  ? TakeTagName<Rest>
+  : never;
+
+type FirstRootTag<Strings extends readonly string[]> = Strings extends readonly [
+  infer First extends string,
+  ...string[]
+]
+  ? FirstTagFromSegment<First>
+  : never;
+
+type DefaultNodeForTemplate<Strings extends readonly string[]> = FirstRootTag<Strings> extends infer Tag extends string
+  ? [Tag] extends [never]
+    ? Node<string, Record<string, unknown> | null, HTMLElement>
+    : Tag extends ''
+      ? Node<string, Record<string, unknown> | null, HTMLElement>
+      : Node<Lowercase<Tag>, Record<string, unknown> | null, ElementForTag<Tag>>
+  : Node<string, Record<string, unknown> | null, HTMLElement>;
+
+export type DefaultHtml = <const Strings extends readonly string[], const Values extends readonly unknown[]>(
+  strings: TemplateStringsArray & Strings,
+  ...values: ValidateInterpolationValues<InterpolationContexts<Strings>, Values, DefaultIntrinsicElements>
+) => DefaultNodeForTemplate<Strings> | DefaultNodeForTemplate<Strings>[];
+
+const html = bind(defaultH) as DefaultHtml;
 
 export default html;

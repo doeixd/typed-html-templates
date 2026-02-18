@@ -10,7 +10,14 @@
   },
   "license": "MIT",
   "keywords": [
-    "pridepack"
+    "html",
+    "htm",
+    "tagged-template-literals",
+    "typescript",
+    "type-safety",
+    "jsx-alternative",
+    "hyperscript",
+    "templating"
   ],
   "devDependencies": {
     "@types/node": "^22.10.2",
@@ -36,17 +43,34 @@
     "release:major": "npm version major && git push origin HEAD --follow-tags"
   },
   "private": false,
-  "description": "Typed Html Templates",
+  "description": "HTM-compatible html tagged templates with strong TypeScript hole typing and DOM-aware inference.",
   "repository": {
     "url": "https://github.com/doeixd/typed-html-templates",
     "type": "git"
   },
   "homepage": "https://github.com/doeixd/typed-html-templates",
   "bugs": {
-    "url": ""
+    "url": "https://github.com/doeixd/typed-html-templates/issues"
   },
   "author": "Patrick Glenn",
   "publishConfig": {
     "access": "public"
+  },
+  "types": "./dist/types/index.d.ts",
+  "main": "./dist/cjs/production/index.js",
+  "module": "./dist/esm/production/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "development": {
+        "require": "./dist/cjs/development/index.js",
+        "import": "./dist/esm/development/index.js"
+      },
+      "require": "./dist/cjs/production/index.js",
+      "import": "./dist/esm/production/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {}
   }
 }
